@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>Bitácora de Vuelo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A1218;
+    --panel:#111D26;
+    --panel-2:#17242E;
+    --border:#25373F;
+    --text:#DCE7EC;
+    --text-dim:#7F97A1;
+    --green:#26D9A3;
+    --green-dim:#0F5942;
+    --amber:#F5A623;
+    --amber-dim:#4A3610;
+    --red:#EF5257;
+    --red-dim:#4A1B1D;
+    --blue:#4FA3E3;
+  }
+  *{box-sizing:border-box;}
+  html,body{background:var(--bg); color:var(--text); font-family:'IBM Plex Sans',sans-serif; -webkit-tap-highlight-color:transparent;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:14px;}
+  .panel-2{background:var(--panel-2); border:1px solid var(--border); border-radius:12px;}
+  .divider{border-color:var(--border);}
+  ::selection{background:var(--green-dim); color:var(--green);}
+
+  input, select, textarea{
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    border-radius:8px; padding:.6rem .75rem; width:100%; font-size:.95rem;
+  }
+  input:focus, select:focus, textarea:focus{
+    outline:2px solid var(--green); outline-offset:1px; border-color:var(--green);
+  }
+  label.field-label{ font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim); font-weight:600; }
+
+  /* Segmented / pill radio */
+  .seg{ display:flex; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .seg input{ display:none; }
+  .seg label{
+    flex:1; text-align:center; padding:.55rem .5rem; font-size:.85rem; font-weight:600;
+    color:var(--text-dim); cursor:pointer; transition:.15s; user-select:none;
+  }
+  .seg input:checked + label{ background:var(--green-dim); color:var(--green); }
+  .seg label:not(:last-child){ border-right:1px solid var(--border); }
+
+  /* Tab bar (cockpit softkeys) */
+  .tabbar{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:.35rem; }
+  .tab-btn{
+    font-family:'JetBrains Mono',monospace; font-size:.72rem; font-weight:700; letter-spacing:.03em;
+    color:var(--text-dim); padding:.55rem .3rem; border-radius:10px; transition:.15s; text-align:center;
+  }
+  .tab-btn.active{ background:var(--green-dim); color:var(--green); box-shadow: inset 0 0 0 1px rgba(38,217,163,.35); }
+
+  /* Odometer / Hobbs-meter digit readout — signature element */
+  .odometer{
+    display:inline-flex; background:#050B0F; border:2px solid #2A3D46; border-radius:6px;
+    padding:.5rem .7rem; box-shadow: inset 0 2px 6px rgba(0,0,0,.6);
+  }
+  .odometer .digits{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:1.6rem; letter-spacing:.05em;
+    color:var(--green); text-shadow:0 0 8px rgba(38,217,163,.55);
+  }
+  .odometer .unit{ font-family:'JetBrains Mono',monospace; font-size:.65rem; color:var(--text-dim); align-self:flex-end; margin-left:.35rem; margin-bottom:.15rem;}
+
+  .led{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+  .led-green{ background:var(--green); box-shadow:0 0 6px var(--green);}
+  .led-red{ background:var(--red); box-shadow:0 0 6px var(--red);}
+  .led-amber{ background:var(--amber); box-shadow:0 0 6px var(--amber);}
+  .led-gray{ background:#3A4A52; }
+
+  .badge{ font-size:.65rem; font-weight:700; letter-spacing:.05em; padding:.2rem .55rem; border-radius:999px; text-transform:uppercase; }
+  .badge-green{ background:var(--green-dim); color:var(--green); }
+  .badge-red{ background:var(--red-dim); color:var(--red); }
+  .badge-amber{ background:var(--amber-dim); color:var(--amber); }
+
+  .scrollx{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  table{ border-collapse:collapse; width:100%; font-size:.82rem; }
+  th{ text-align:left; font-family:'JetBrains Mono',monospace; font-size:.65rem; letter-spacing:.05em; color:var(--text-dim); text-transform:uppercase; padding:.5rem .6rem; border-bottom:1px solid var(--border); white-space:nowrap;}
+  td{ padding:.5rem .6rem; border-bottom:1px solid #1A282F; white-space:nowrap; }
+  tr:hover td{ background:rgba(255,255,255,.02); }
+
+  .btn-primary{
+    background:var(--green); color:#04120D; font-weight:700; border-radius:10px; padding:.85rem 1rem;
+    transition:.15s; font-size:.95rem;
+  }
+  .btn-primary:active{ transform:scale(.98); }
+  .btn-ghost{
+    background:transparent; border:1px solid var(--border); color:var(--text-dim); border-radius:10px; padding:.6rem 1rem; font-size:.85rem; font-weight:600;
+  }
+
+  .toast{
+    position:fixed; bottom:1rem; left:50%; transform:translateX(-50%) translateY(150%);
+    background:var(--panel-2); border:1px solid var(--green); color:var(--green); padding:.75rem 1.2rem; border-radius:10px;
+    font-weight:600; font-size:.85rem; z-index:100; transition:transform .25s ease; box-shadow:0 8px 24px rgba(0,0,0,.5);
+    display:flex; align-items:center; gap:.5rem; max-width:90vw;
+  }
+  .toast.show{ transform:translateX(-50%) translateY(0); }
+  .toast.error{ border-color:var(--red); color:var(--red); }
+
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:flex-end; justify-content:center; z-index:90; }
+  .modal-backdrop.show{ display:flex; }
+  @media(min-width:640px){ .modal-backdrop{ align-items:center; } }
+  .modal{ background:var(--panel); border:1px solid var(--border); border-radius:16px 16px 0 0; width:100%; max-width:480px; padding:1.25rem; max-height:85vh; overflow-y:auto; }
+  @media(min-width:640px){ .modal{ border-radius:16px; } }
+
+  ::-webkit-scrollbar{ height:6px; width:6px; }
+  ::-webkit-scrollbar-thumb{ background:#2A3D46; border-radius:3px; }
+</style>
+</head>
+<body class="min-h-screen pb-6">
+
+  <!-- HEADER -->
+  <header class="sticky top-0 z-40 backdrop-blur" style="background:rgba(10,18,24,.92); border-bottom:1px solid var(--border);">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-2.5 h-2.5 rounded-full" id="conn-led" style="background:#3A4A52;"></div>
+        <div>
+          <h1 class="text-sm font-bold tracking-wide mono">BITÁCORA DE VUELO</h1>
+          <p class="text-[10px] mono" style="color:var(--text-dim);" id="conn-label">Sin conexión configurada</p>
+        </div>
+      </div>
+      <button onclick="openConfigModal()" class="btn-ghost mono text-xs">⚙ CONFIG</button>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 mt-4">
+
+    <!-- TAB BAR -->
+    <nav class="tabbar grid grid-cols-3 gap-1 mb-4">
+      <button class="tab-btn active" data-tab="form" onclick="switchTab('form')">✏️<br>FORMULARIO</button>
+      <button class="tab-btn" data-tab="pilot" onclick="switchTab('pilot')">👨‍✈️<br>LIBRO PILOTO</button>
+      <button class="tab-btn" data-tab="aircraft" onclick="switchTab('aircraft')">🛩️<br>LIBRO AVIÓN</button>
+    </nav>
+
+    <!-- ======================= TAB: FORMULARIO ======================= -->
+    <section id="tab-form" class="tab-panel space-y-4">
+      <form id="flight-form" class="panel p-4 space-y-4" onsubmit="return false;">
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">Fecha del vuelo</label>
+            <input type="date" id="f-fecha" required>
+          </div>
+          <div>
+            <label class="field-label">Matrícula</label>
+            <input type="text" id="f-matricula" placeholder="EC-ABC" required style="text-transform:uppercase;">
+          </div>
+        </div>
+
+        <div>
+          <label class="field-label">Modelo / Tipo de avión</label>
+          <input type="text" id="f-modelo" placeholder="Cessna 172" required>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">Piloto al mando (PIC)</label>
+            <input type="text" id="f-pic" placeholder="Nombre" required>
+          </div>
+          <div>
+            <label class="field-label">Copiloto (SIC)</label>
+            <input type="text" id="f-sic" placeholder="Opcional">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">Origen (OACI/IATA)</label>
+            <input type="text" id="f-origen" placeholder="LEBB" required style="text-transform:uppercase;">
+          </div>
+          <div>
+            <label class="field-label">Destino (OACI/IATA)</label>
+            <input type="text" id="f-destino" placeholder="LEVT" required style="text-transform:uppercase;">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">Salida (calzos, UTC)</label>
+            <input type="time" id="f-salida" required>
+          </div>
+          <div>
+            <label class="field-label">Llegada (calzos, UTC)</label>
+            <input type="time" id="f-llegada" required>
+          </div>
+        </div>
+
+        <div class="panel-2 rounded-lg p-3 flex items-center justify-between">
+          <span class="field-label">Tiempo total de vuelo</span>
+          <div class="odometer">
+            <span class="digits" id="f-tiempo-total">00:00</span>
+            <span class="unit">HH:MM</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="field-label mb-1 block">Tipo de vuelo</label>
+          <select id="f-tipovuelo" required>
+            <option value="Solo">Solo</option>
+            <option value="Instrucción">Instrucción</option>
+            <option value="Comercial">Comercial</option>
+            <option value="Privado">Privado</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="field-label mb-1 block">Regla de vuelo</label>
+          <div class="seg">
+            <input type="radio" name="f-regla" id="f-regla-vfr" value="VFR" checked>
+            <label for="f-regla-vfr">VFR · Visual</label>
+            <input type="radio" name="f-regla" id="f-regla-ifr" value="IFR">
+            <label for="f-regla-ifr">IFR · Instrumental</label>
+          </div>
+        </div>
+
+        <div>
+          <label class="field-label mb-1 block">Franja horaria</label>
+          <div class="seg">
+            <input type="radio" name="f-franja" id="f-franja-dia" value="Diurno" checked>
+            <label for="f-franja-dia">☀ Diurno</label>
+            <input type="radio" name="f-franja" id="f-franja-noche" value="Nocturno">
+            <label for="f-franja-noche">🌙 Nocturno</label>
+          </div>
+        </div>
+
+        <div>
+          <label class="field-label">Número de aterrizajes</label>
+          <input type="number" id="f-aterrizajes" min="1" step="1" value="1" required>
+        </div>
+
+        <div>
+          <label class="field-label">Notas / novedades del avión</label>
+          <textarea id="f-notas" rows="3" placeholder="Reporta aquí cualquier fallo o novedad técnica (opcional). Si escribes algo aquí, se abrirá automáticamente un reporte de mantenimiento."></textarea>
+        </div>
+
+        <button type="button" class="btn-primary w-full mono" onclick="submitFlight()" id="submit-btn">
+          REGISTRAR VUELO
+        </button>
+      </form>
+    </section>
+
+    <!-- ======================= TAB: LIBRO DE PILOTO ======================= -->
+    <section id="tab-pilot" class="tab-panel space-y-4" style="display:none;">
+      <div class="panel p-4">
+        <label class="field-label mb-1 block">Piloto</label>
+        <div class="flex gap-2">
+          <input type="text" id="pilot-select" list="pilot-list" placeholder="Nombre del piloto (PIC)">
+          <datalist id="pilot-list"></datalist>
+          <button class="btn-ghost mono text-xs whitespace-nowrap" onclick="loadPilotSummary()">CARGAR</button>
+        </div>
+      </div>
+
+      <div id="pilot-empty" class="panel p-6 text-center text-sm" style="color:var(--text-dim);">
+        Introduce el nombre de un piloto y pulsa CARGAR para ver su bitácora.
+      </div>
+
+      <div id="pilot-data" style="display:none;" class="space-y-4">
+        <div class="panel p-4 flex items-center justify-between">
+          <div>
+            <p class="field-label">Horas totales acumuladas</p>
+            <div class="odometer mt-1">
+              <span class="digits" id="p-total-horas">0000.0</span><span class="unit">HRS</span>
+            </div>
+          </div>
+          <div class="text-right">
+            <p class="field-label">Vuelos registrados</p>
+            <p class="mono text-2xl font-bold" id="p-total-vuelos">0</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="panel-2 p-3 rounded-lg">
+            <p class="field-label mb-2">Regla de vuelo</p>
+            <div class="flex justify-between text-sm"><span style="color:var(--blue)">VFR</span><span class="mono" id="p-vfr">0.0</span></div>
+            <div class="flex justify-between text-sm mt-1"><span style="color:var(--amber)">IFR</span><span class="mono" id="p-ifr">0.0</span></div>
+          </div>
+          <div class="panel-2 p-3 rounded-lg">
+            <p class="field-label mb-2">Franja horaria</p>
+            <div class="flex justify-between text-sm"><span style="color:var(--green)">Diurno</span><span class="mono" id="p-diurno">0.0</span></div>
+            <div class="flex justify-between text-sm mt-1"><span style="color:var(--blue)">Nocturno</span><span class="mono" id="p-nocturno">0.0</span></div>
+          </div>
+        </div>
+
+        <div class="panel p-4">
+          <div class="flex items-center justify-between mb-1">
+            <p class="field-label">Moneda 90 días · aterrizajes</p>
+            <span class="badge" id="p-currency-badge">—</span>
+          </div>
+          <p class="mono text-3xl font-bold" id="p-currency" style="color:var(--green);">0</p>
+          <p class="text-xs mt-1" style="color:var(--text-dim);">Aterrizajes realizados en los últimos 90 días.</p>
+        </div>
+
+        <div class="panel p-4">
+          <p class="field-label mb-2">Historial de vuelos</p>
+          <div class="scrollx">
+            <table>
+              <thead><tr><th>Fecha</th><th>Matríc.</th><th>Ruta</th><th>Horas</th><th>Regla</th><th>Franja</th><th>Att.</th></tr></thead>
+              <tbody id="p-historial"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= TAB: LIBRO DE AVIÓN ======================= -->
+    <section id="tab-aircraft" class="tab-panel space-y-4" style="display:none;">
+      <div class="panel p-4">
+        <label class="field-label mb-1 block">Matrícula</label>
+        <div class="flex gap-2">
+          <input type="text" id="aircraft-select" list="aircraft-list" placeholder="EC-ABC" style="text-transform:uppercase;">
+          <datalist id="aircraft-list"></datalist>
+          <button class="btn-ghost mono text-xs whitespace-nowrap" onclick="loadAircraftSummary()">CARGAR</button>
+        </div>
+      </div>
+
+      <div id="aircraft-empty" class="panel p-6 text-center text-sm" style="color:var(--text-dim);">
+        Introduce una matrícula y pulsa CARGAR para ver la ficha de la aeronave.
+      </div>
+
+      <div id="aircraft-data" style="display:none;" class="space-y-4">
+
+        <div class="panel p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="field-label">TTAF · Horas totales de célula</p>
+              <div class="odometer mt-1">
+                <span class="digits" id="a-ttaf">0000.0</span><span class="unit">HRS</span>
+              </div>
+            </div>
+            <button class="btn-ghost mono text-xs" onclick="openAircraftConfigModal()">⚙ AJUSTAR</button>
+          </div>
+        </div>
+
+        <div class="panel p-4">
+          <div class="flex items-center justify-between mb-2">
+            <p class="field-label">Próxima inspección</p>
+            <span class="badge" id="a-insp-badge">—</span>
+          </div>
+          <div class="w-full h-2 rounded-full overflow-hidden" style="background:#1A282F;">
+            <div id="a-insp-bar" class="h-full" style="width:0%; background:var(--green); transition:width .3s;"></div>
+          </div>
+          <div class="flex justify-between mt-2 text-xs mono" style="color:var(--text-dim);">
+            <span id="a-insp-restantes">-- hrs restantes</span>
+            <span id="a-insp-objetivo">objetivo: -- hrs</span>
+          </div>
+        </div>
+
+        <div class="panel p-4">
+          <p class="field-label mb-2">Novedades abiertas <span id="a-open-count" class="badge badge-red ml-1">0</span></p>
+          <div id="a-squawks-open" class="space-y-2"></div>
+        </div>
+
+        <div class="panel p-4">
+          <p class="field-label mb-2">Novedades cerradas <span id="a-closed-count" class="badge badge-green ml-1">0</span></p>
+          <div id="a-squawks-closed" class="space-y-2"></div>
+        </div>
+
+        <div class="panel p-4">
+          <p class="field-label mb-2">Historial de vuelos</p>
+          <div class="scrollx">
+            <table>
+              <thead><tr><th>Fecha</th><th>PIC</th><th>Ruta</th><th>Horas</th><th>Tipo</th><th>Att.</th></tr></thead>
+              <tbody id="a-historial"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <!-- MODAL: CONFIGURACIÓN GENERAL -->
+  <div class="modal-backdrop" id="config-modal">
+    <div class="modal">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-bold mono text-sm">⚙ CONFIGURACIÓN</h2>
+        <button onclick="closeModal('config-modal')" class="btn-ghost mono text-xs">CERRAR</button>
+      </div>
+      <label class="field-label mb-1 block">URL del Web App (Google Apps Script)</label>
+      <input type="text" id="cfg-url" placeholder="https://script.google.com/macros/s/AKfycb.../exec" class="mb-3">
+      <p class="text-xs mb-3" style="color:var(--text-dim);">Pega aquí la URL que obtienes al desplegar el Code.gs como aplicación web (ver INSTRUCCIONES.md).</p>
+      <div class="flex gap-2">
+        <button class="btn-primary flex-1 mono text-xs" onclick="saveConfig()">GUARDAR</button>
+        <button class="btn-ghost flex-1 mono text-xs" onclick="testConnection()">PROBAR CONEXIÓN</button>
+      </div>
+      <p class="text-xs mt-2 mono" id="cfg-test-result"></p>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIGURACIÓN DE AERONAVE -->
+  <div class="modal-backdrop" id="aircraft-config-modal">
+    <div class="modal">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-bold mono text-sm">⚙ AJUSTES DE AERONAVE</h2>
+        <button onclick="closeModal('aircraft-config-modal')" class="btn-ghost mono text-xs">CERRAR</button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="field-label">Matrícula</label>
+          <input type="text" id="ac-matricula" disabled style="text-transform:uppercase; opacity:.7;">
+        </div>
+        <div>
+          <label class="field-label">TTAF inicial (horas ya voladas antes de usar la app)</label>
+          <input type="number" id="ac-ttaf-inicial" min="0" step="0.1" value="0">
+        </div>
+        <div>
+          <label class="field-label">Horas de célula en la última inspección</label>
+          <input type="number" id="ac-horas-ultima" min="0" step="0.1" value="0">
+        </div>
+        <div>
+          <label class="field-label mb-1 block">Intervalo de inspección</label>
+          <select id="ac-intervalo">
+            <option value="50">Cada 50 horas</option>
+            <option value="100" selected>Cada 100 horas</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">Fecha de la última inspección</label>
+          <input type="date" id="ac-fecha-ultima">
+        </div>
+        <button class="btn-primary w-full mono text-xs" onclick="saveAircraftConfig()">GUARDAR AJUSTES</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ============================================================================
+// CONFIG / STORAGE
+// ============================================================================
+const STORAGE_KEY = 'flightlog_config_v1';
+
+function loadLocalConfig(){
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch(e){ return {}; }
+}
+function saveLocalConfig(cfg){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+}
+let CONFIG = loadLocalConfig();
+
+function setConnLed(state){
+  const led = document.getElementById('conn-led');
+  const label = document.getElementById('conn-label');
+  if(state === 'ok'){ led.style.background = 'var(--green)'; led.style.boxShadow='0 0 6px var(--green)'; label.textContent = 'Conectado a Google Sheets'; }
+  else if(state === 'error'){ led.style.background = 'var(--red)'; led.style.boxShadow='0 0 6px var(--red)'; label.textContent = 'Error de conexión'; }
+  else { led.style.background = '#3A4A52'; led.style.boxShadow='none'; label.textContent = 'Sin conexión configurada'; }
+}
+
+// ============================================================================
+// API HELPERS
+// ============================================================================
+async function apiGet(action, params={}){
+  if(!CONFIG.webAppUrl){ throw new Error('Configura primero la URL del Web App (⚙ CONFIG).'); }
+  const url = new URL(CONFIG.webAppUrl);
+  url.searchParams.set('action', action);
+  Object.keys(params).forEach(k => { if(params[k] !== undefined && params[k] !== '') url.searchParams.set(k, params[k]); });
+  const res = await fetch(url.toString(), { method:'GET' });
+  const json = await res.json();
+  if(json.status !== 'success') throw new Error(json.message || 'Error desconocido');
+  return json.data;
+}
+
+async function apiPost(action, payload){
+  if(!CONFIG.webAppUrl){ throw new Error('Configura primero la URL del Web App (⚙ CONFIG).'); }
+  const res = await fetch(CONFIG.webAppUrl, {
+    method:'POST',
+    headers:{ 'Content-Type':'text/plain;charset=utf-8' }, // evita preflight CORS en Apps Script
+    body: JSON.stringify({ action, payload })
+  });
+  const json = await res.json();
+  if(json.status !== 'success') throw new Error(json.message || 'Error desconocido');
+  return json.data;
+}
+
+// ============================================================================
+// TOAST
+// ============================================================================
+let toastTimer;
+function showToast(msg, isError=false){
+  const t = document.getElementById('toast');
+  t.textContent = (isError ? '⚠ ' : '✓ ') + msg;
+  t.classList.toggle('error', isError);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove('show'), 3200);
+}
+
+// ============================================================================
+// TABS
+// ============================================================================
+function switchTab(name){
+  document.querySelectorAll('.tab-panel').forEach(el => el.style.display = 'none');
+  document.getElementById('tab-'+name).style.display = '';
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  if(name === 'pilot') refreshPilotList();
+  if(name === 'aircraft') refreshAircraftList();
+}
+
+// ============================================================================
+// MODALS
+// ============================================================================
+function openModal(id){ document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+function openConfigModal(){
+  document.getElementById('cfg-url').value = CONFIG.webAppUrl || '';
+  document.getElementById('cfg-test-result').textContent = '';
+  openModal('config-modal');
+}
+function saveConfig(){
+  const url = document.getElementById('cfg-url').value.trim();
+  if(!url){ showToast('Introduce una URL válida', true); return; }
+  CONFIG.webAppUrl = url;
+  saveLocalConfig(CONFIG);
+  showToast('Configuración guardada');
+  closeModal('config-modal');
+  testConnection(true);
+}
+async function testConnection(silent){
+  const resultEl = document.getElementById('cfg-test-result');
+  try{
+    await apiGet('ping');
+    setConnLed('ok');
+    if(!silent){ resultEl.textContent = '✓ Conexión correcta'; resultEl.style.color = 'var(--green)'; }
+  }catch(err){
+    setConnLed('error');
+    if(!silent){ resultEl.textContent = '✗ ' + err.message; resultEl.style.color = 'var(--red)'; }
+  }
+}
+
+// ============================================================================
+// FORMULARIO: cálculo automático de duración
+// ============================================================================
+function computeDuration(){
+  const salida = document.getElementById('f-salida').value;
+  const llegada = document.getElementById('f-llegada').value;
+  const out = document.getElementById('f-tiempo-total');
+  if(!salida || !llegada){ out.textContent = '00:00'; return {hhmm:'00:00', decimal:0}; }
+  const [sh, sm] = salida.split(':').map(Number);
+  const [lh, lm] = llegada.split(':').map(Number);
+  let startMin = sh*60+sm;
+  let endMin = lh*60+lm;
+  if(endMin <= startMin) endMin += 24*60; // cruce de medianoche
+  const totalMin = endMin - startMin;
+  const h = Math.floor(totalMin/60);
+  const m = totalMin % 60;
+  const hhmm = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+  const decimal = Math.round((totalMin/60)*100)/100;
+  out.textContent = hhmm;
+  return { hhmm, decimal };
+}
+document.getElementById('f-salida').addEventListener('input', computeDuration);
+document.getElementById('f-llegada').addEventListener('input', computeDuration);
+
+// Fecha por defecto: hoy
+(function initDefaults(){
+  const today = new Date();
+  const iso = today.toISOString().slice(0,10);
+  document.getElementById('f-fecha').value = iso;
+})();
+
+function toDMY(isoDate){
+  const [y,m,d] = isoDate.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+// ============================================================================
+// FORMULARIO: envío
+// ============================================================================
+async function submitFlight(){
+  const btn = document.getElementById('submit-btn');
+  const fecha = document.getElementById('f-fecha').value;
+  const matricula = document.getElementById('f-matricula').value.trim();
+  const modelo = document.getElementById('f-modelo').value.trim();
+  const pic = document.getElementById('f-pic').value.trim();
+  const sic = document.getElementById('f-sic').value.trim();
+  const origen = document.getElementById('f-origen').value.trim();
+  const destino = document.getElementById('f-destino').value.trim();
+  const salida = document.getElementById('f-salida').value;
+  const llegada = document.getElementById('f-llegada').value;
+  const tipoVuelo = document.getElementById('f-tipovuelo').value;
+  const reglaVuelo = document.querySelector('input[name="f-regla"]:checked').value;
+  const franja = document.querySelector('input[name="f-franja"]:checked').value;
+  const aterrizajes = document.getElementById('f-aterrizajes').value;
+  const notas = document.getElementById('f-notas').value.trim();
+
+  if(!fecha || !matricula || !modelo || !pic || !origen || !destino || !salida || !llegada){
+    showToast('Completa todos los campos obligatorios', true); return;
+  }
+  const dur = computeDuration();
+  if(dur.decimal <= 0){ showToast('El tiempo total de vuelo debe ser mayor que cero', true); return; }
+  if(Number(aterrizajes) < 1){ showToast('El número de aterrizajes debe ser al menos 1', true); return; }
+
+  const payload = {
+    fecha: toDMY(fecha), matricula, modelo, pic, sic,
+    origen, destino, salida, llegada,
+    tiempoHHMM: dur.hhmm, tiempoDecimal: dur.decimal,
+    tipoVuelo, reglaVuelo, franja,
+    aterrizajes: Number(aterrizajes), notas
+  };
+
+  btn.disabled = true; btn.textContent = 'REGISTRANDO...';
+  try{
+    await apiPost('addFlight', payload);
+    setConnLed('ok');
+    showToast('Vuelo registrado correctamente');
+    resetForm();
+  }catch(err){
+    setConnLed('error');
+    showToast(err.message, true);
+  }finally{
+    btn.disabled = false; btn.textContent = 'REGISTRAR VUELO';
+  }
+}
+
+function resetForm(){
+  document.getElementById('flight-form').reset();
+  document.getElementById('f-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('f-aterrizajes').value = 1;
+  document.getElementById('f-regla-vfr').checked = true;
+  document.getElementById('f-franja-dia').checked = true;
+  document.getElementById('f-tiempo-total').textContent = '00:00';
+}
+
+// ============================================================================
+// LIBRO DE PILOTO
+// ============================================================================
+async function refreshPilotList(){
+  try{
+    const list = await apiGet('getPilotList');
+    const dl = document.getElementById('pilot-list');
+    dl.innerHTML = list.map(p => `<option value="${escapeHtml(p)}">`).join('');
+    setConnLed('ok');
+  }catch(err){ setConnLed('error'); }
+}
+
+async function loadPilotSummary(){
+  const pilot = document.getElementById('pilot-select').value.trim();
+  if(!pilot){ showToast('Escribe el nombre de un piloto', true); return; }
+  try{
+    const data = await apiGet('getPilotSummary', { pilot });
+    setConnLed('ok');
+    renderPilotSummary(data);
+  }catch(err){
+    setConnLed('error');
+    showToast(err.message, true);
+  }
+}
+
+function renderPilotSummary(d){
+  document.getElementById('pilot-empty').style.display = 'none';
+  document.getElementById('pilot-data').style.display = '';
+
+  document.getElementById('p-total-horas').textContent = d.totalHoras.toFixed(1).padStart(6,'0');
+  document.getElementById('p-total-vuelos').textContent = d.totalVuelos;
+  document.getElementById('p-vfr').textContent = d.vfr.toFixed(1);
+  document.getElementById('p-ifr').textContent = d.ifr.toFixed(1);
+  document.getElementById('p-diurno').textContent = d.diurno.toFixed(1);
+  document.getElementById('p-nocturno').textContent = d.nocturno.toFixed(1);
+  document.getElementById('p-currency').textContent = d.aterrizajes90;
+
+  const badge = document.getElementById('p-currency-badge');
+  if(d.aterrizajes90 >= 3){ badge.textContent = 'VIGENTE'; badge.className = 'badge badge-green'; }
+  else { badge.textContent = 'REVISAR'; badge.className = 'badge badge-amber'; }
+
+  const tbody = document.getElementById('p-historial');
+  tbody.innerHTML = d.historial.map(r => `
+    <tr>
+      <td class="mono">${escapeHtml(r.Fecha)}</td>
+      <td class="mono">${escapeHtml(r.Matricula)}</td>
+      <td class="mono">${escapeHtml(r.Origen)}→${escapeHtml(r.Destino)}</td>
+      <td class="mono">${Number(r.Tiempo_Total_Decimal).toFixed(1)}</td>
+      <td>${escapeHtml(r.Regla_Vuelo)}</td>
+      <td>${escapeHtml(r.Franja_Horaria)}</td>
+      <td class="mono">${r.Aterrizajes}</td>
+    </tr>
+  `).join('') || `<tr><td colspan="7" class="text-center" style="color:var(--text-dim);">Sin vuelos registrados</td></tr>`;
+}
+
+// ============================================================================
+// LIBRO DE AVIÓN
+// ============================================================================
+async function refreshAircraftList(){
+  try{
+    const list = await apiGet('getAircraftList');
+    const dl = document.getElementById('aircraft-list');
+    dl.innerHTML = list.map(a => `<option value="${escapeHtml(a)}">`).join('');
+    setConnLed('ok');
+  }catch(err){ setConnLed('error'); }
+}
+
+let currentAircraftSummary = null;
+
+async function loadAircraftSummary(){
+  const matricula = document.getElementById('aircraft-select').value.trim().toUpperCase();
+  if(!matricula){ showToast('Escribe una matrícula', true); return; }
+  try{
+    const data = await apiGet('getAircraftSummary', { matricula });
+    setConnLed('ok');
+    currentAircraftSummary = data;
+    renderAircraftSummary(data);
+  }catch(err){
+    setConnLed('error');
+    showToast(err.message, true);
+  }
+}
+
+function renderAircraftSummary(d){
+  document.getElementById('aircraft-empty').style.display = 'none';
+  document.getElementById('aircraft-data').style.display = '';
+
+  document.getElementById('a-ttaf').textContent = d.ttafActual.toFixed(1).padStart(6,'0');
+
+  const restantes = d.horasRestantesInspeccion;
+  const pct = Math.max(0, Math.min(100, (1 - (restantes / (d.intervaloInspeccion || 1))) * 100));
+  document.getElementById('a-insp-bar').style.width = pct + '%';
+  document.getElementById('a-insp-restantes').textContent = restantes.toFixed(1) + ' hrs restantes';
+  document.getElementById('a-insp-objetivo').textContent = 'objetivo: ' + d.proximaInspeccionEn.toFixed(1) + ' hrs';
+
+  const badge = document.getElementById('a-insp-badge');
+  const bar = document.getElementById('a-insp-bar');
+  if(!d.tieneConfiguracion){
+    badge.textContent = 'SIN CONFIGURAR'; badge.className = 'badge badge-amber';
+    bar.style.background = 'var(--text-dim)';
+  } else if(restantes <= 0){
+    badge.textContent = 'INSPECCIÓN VENCIDA'; badge.className = 'badge badge-red';
+    bar.style.background = 'var(--red)';
+  } else if(restantes <= (d.intervaloInspeccion * 0.15)){
+    badge.textContent = 'PRÓXIMA'; badge.className = 'badge badge-amber';
+    bar.style.background = 'var(--amber)';
+  } else {
+    badge.textContent = 'OK'; badge.className = 'badge badge-green';
+    bar.style.background = 'var(--green)';
+  }
+
+  document.getElementById('a-open-count').textContent = d.squawksAbiertos.length;
+  document.getElementById('a-closed-count').textContent = d.squawksCerrados.length;
+
+  document.getElementById('a-squawks-open').innerHTML = d.squawksAbiertos.map(s => `
+    <div class="panel-2 p-3 rounded-lg flex items-start justify-between gap-2">
+      <div>
+        <p class="text-sm">${escapeHtml(s.Descripcion)}</p>
+        <p class="text-xs mono mt-1" style="color:var(--text-dim);">Abierto: ${escapeHtml(String(s.Fecha_Apertura))}</p>
+      </div>
+      <button class="btn-ghost mono text-xs whitespace-nowrap" onclick="closeSquawk(${JSON.stringify(s.ID)})">CERRAR</button>
+    </div>
+  `).join('') || `<p class="text-sm" style="color:var(--text-dim);">Sin novedades abiertas.</p>`;
+
+  document.getElementById('a-squawks-closed').innerHTML = d.squawksCerrados.map(s => `
+    <div class="panel-2 p-3 rounded-lg opacity-60">
+      <p class="text-sm">${escapeHtml(s.Descripcion)}</p>
+      <p class="text-xs mono mt-1" style="color:var(--text-dim);">Cerrado: ${escapeHtml(String(s.Fecha_Cierre))}</p>
+    </div>
+  `).join('') || `<p class="text-sm" style="color:var(--text-dim);">Sin novedades cerradas.</p>`;
+
+  const tbody = document.getElementById('a-historial');
+  tbody.innerHTML = d.historial.map(r => `
+    <tr>
+      <td class="mono">${escapeHtml(r.Fecha)}</td>
+      <td>${escapeHtml(r.PIC)}</td>
+      <td class="mono">${escapeHtml(r.Origen)}→${escapeHtml(r.Destino)}</td>
+      <td class="mono">${Number(r.Tiempo_Total_Decimal).toFixed(1)}</td>
+      <td>${escapeHtml(r.Tipo_Vuelo)}</td>
+      <td class="mono">${r.Aterrizajes}</td>
+    </tr>
+  `).join('') || `<tr><td colspan="6" class="text-center" style="color:var(--text-dim);">Sin vuelos registrados</td></tr>`;
+}
+
+async function closeSquawk(id){
+  try{
+    await apiPost('closeSquawk', { id });
+    showToast('Reporte cerrado');
+    loadAircraftSummary();
+  }catch(err){
+    showToast(err.message, true);
+  }
+}
+
+function openAircraftConfigModal(){
+  if(!currentAircraftSummary){ showToast('Carga primero una aeronave', true); return; }
+  document.getElementById('ac-matricula').value = currentAircraftSummary.matricula;
+  document.getElementById('ac-ttaf-inicial').value = currentAircraftSummary.ttafInicial || 0;
+  document.getElementById('ac-horas-ultima').value = currentAircraftSummary.horasUltimaInspeccion || 0;
+  document.getElementById('ac-intervalo').value = currentAircraftSummary.intervaloInspeccion || 100;
+  openModal('aircraft-config-modal');
+}
+
+async function saveAircraftConfig(){
+  const payload = {
+    matricula: document.getElementById('ac-matricula').value,
+    ttafInicial: Number(document.getElementById('ac-ttaf-inicial').value) || 0,
+    horasUltimaInspeccion: Number(document.getElementById('ac-horas-ultima').value) || 0,
+    intervaloInspeccion: Number(document.getElementById('ac-intervalo').value) || 100,
+    fechaUltimaInspeccion: document.getElementById('ac-fecha-ultima').value ? toDMY(document.getElementById('ac-fecha-ultima').value) : ''
+  };
+  try{
+    await apiPost('setAircraftConfig', payload);
+    showToast('Ajustes de aeronave guardados');
+    closeModal('aircraft-config-modal');
+    loadAircraftSummary();
+  }catch(err){
+    showToast(err.message, true);
+  }
+}
+
+// ============================================================================
+// UTILS
+// ============================================================================
+function escapeHtml(str){
+  if(str === undefined || str === null) return '';
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Al cargar: si hay URL configurada, probar conexión en segundo plano
+if(CONFIG.webAppUrl){ testConnection(true); }
+else { setTimeout(()=> showToast('Configura la URL del Web App en ⚙ CONFIG', true), 500); }
+</script>
+</body>
+</html>
